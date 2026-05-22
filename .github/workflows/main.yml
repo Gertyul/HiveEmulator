@@ -79,6 +79,15 @@ jobs:
           source: "src/docker-compose.yaml"
           target: "/home/ec2-user/hive-emulator/"
           strip_components: 1
+      - name: Copy config.json
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "src/config.json"
+          target: "/home/ec2-user/hive-emulator/"
+          strip_components: 1
       - name: Copy monitoring configs
         uses: appleboy/scp-action@master
         with:
