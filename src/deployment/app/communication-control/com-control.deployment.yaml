@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: com-control
-          image: registry.gitlab.com/kzotkin/hiveemulator/communication-control:latest
+          image: 109389323325.dkr.ecr.us-east-1.amazonaws.com/hiveemulator/communication-control:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -30,11 +30,6 @@ spec:
               cpu: "250m"
           env:
             - name: Redis__ConnectionString
-              valueFrom:
-                secretKeyRef:
-                  name: com-control-secret
-                  key: redis-connection-string
+              value: "redis:6379"
             - name: BasePath
               value: /control
-      imagePullSecrets:
-        - name: gitlab-registry-secret

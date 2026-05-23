@@ -5,20 +5,28 @@ metadata:
   namespace: default
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
     - http:
         paths:
-          - path: /control
-            pathType: Prefix
+          - path: /control(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: com-control
                 port:
                   number: 80
-          - path: /
-            pathType: Prefix
+          - path: /hive-mind(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: hive-mind-service
+                port:
+                  number: 80
+          - path: /()(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: map-client

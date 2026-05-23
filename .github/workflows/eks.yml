@@ -1,0 +1,75 @@
+name: CI/CD Pipeline HiveEmulator EKS
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Snyk security check
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        with:
+          args: --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build and Publish .NET Applications
+        run: |
+          dotnet publish src/CommunicationControl/DevOpsProject -c Release -o src/CommunicationControl/DevOpsProject/published
+          dotnet publish src/CommunicationControl/DevOpsProject.HiveMind.API -c Release -o src/CommunicationControl/DevOpsProject.HiveMind.API/published
+
+      - name: Build Frontend Assets
+        run: |
+          cd src/MapClient
+          npm install
+          npm run build
+
+      - name: Build and Push images to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/hiveemulator/communication-control:latest ./src/CommunicationControl/DevOpsProject
+          docker push $ECR_REGISTRY/hiveemulator/communication-control:latest
+          docker build -t $ECR_REGISTRY/hiveemulator/map-client:latest ./src/MapClient
+          docker push $ECR_REGISTRY/hiveemulator/map-client:latest
+          docker build -t $ECR_REGISTRY/hiveemulator/hive-mind:latest ./src/CommunicationControl/DevOpsProject.HiveMind.API
+          docker push $ECR_REGISTRY/hiveemulator/hive-mind:latest
+
+      - name: Set Kubernetes context
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Deploy to EKS
+        run: |
+          kubectl apply -f src/deployment/infrastrcuture/redis/
+          kubectl apply -f src/deployment/app/communication-control/
+          kubectl apply -f src/deployment/app/map-client/
+          kubectl apply -f src/deployment/app/hive-mind/
+          kubectl apply -f src/deployment/infrastrcuture/ingress/
+          kubectl rollout restart deployment/com-control
+          kubectl rollout restart deployment/map-client
+          kubectl rollout restart deployment/hive-mind
